@@ -1,40 +1,94 @@
 pipeline {
     agent any
-    
+
     tools {
-        maven 'Maven 3.9.6' 
-        jdk 'JDK 17' 
+        jdk 'JDK 17'
+        maven 'Maven 3.9.6'
     }
-    
+
+    options {
+        skipStagesAfterUnstable()
+    }
+
+    environment {
+        JAR_NAME = "eureka-server-1.0.0.jar"
+        REMOTE_DIR = "/home/ec2-user/revhub/jars"
+        APP_PORT = "8761"
+    }
+
     stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Build') {
             steps {
-                bat 'mvn clean compile'
+                bat 'mvn -B clean compile'
+            }
+            post {
+                success {
+                    echo 'Build successful'
+                }
+                failure {
+                    echo 'Build failed'
+                }
             }
         }
-        
+
         stage('Test') {
             steps {
-                bat 'mvn test'
+                bat 'mvn -B test'
+            }
+            post {
+                success {
+                    echo 'Test successful'
+                }
+                failure {
+                    echo 'Test failed'
+                }
             }
         }
-        
+
         stage('Package') {
             steps {
-                bat 'mvn package -DskipTests'
+                bat 'mvn -B package -DskipTests'
+            }
+            post {
+                success {
+                    echo "JAR CREATED SUCCESSFULLY"
+                }
+            }
+        }
+
+        stage("Deploy to EC2") {
+            steps {
+                sshPublisher(
+                    publishers: [
+                        sshPublisherDesc(
+                            configName: "revhub-infrastructure",
+                            verbose: true,
+                            transfers: [
+                                sshTransfer(
+                                    sourceFiles: "target/${JAR_NAME}",
+                                    removePrefix: "target/",
+                                    remoteDirectory: "",
+                                    flatten: true,
+                                    execCommand: "ls -la ${REMOTE_DIR}"
+                                )
+                            ]
+                        )
+                    ]
+                )
             }
         }
     }
-    
+
     post {
         always {
+            echo "Pipeline Done..."
             cleanWs()
-        }
-        success {
-            echo 'Pipeline Job Succeeded! ✅'
-        }
-        failure {
-            echo 'Pipeline Job Failed! ❌'
         }
     }
 }
