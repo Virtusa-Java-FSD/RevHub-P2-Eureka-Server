@@ -61,7 +61,7 @@ pipeline {
                 }
             }
         }
-
+        //EC2 Deploy
         stage("Deploy to EC2") {
             steps {
                 sshPublisher(
